@@ -106,6 +106,23 @@ class AuthenticatedSessionController extends Controller
 
         RateLimiter::clear($throttleKey);
 
+        // Si el usuario es de tipo invitado (guest), solo requiere 1 factor (correo y contraseña)
+        if ($user->role === 'guest') {
+            Auth::login($user, $request->boolean('remember'));
+
+            SecurityLog::create([
+                'user_id' => $user->id,
+                'ip_address' => $request->ip(),
+                'email' => $user->email,
+                'event' => 'Autenticación Exitosa (1 Paso - Invitado)',
+                'status' => 'Autorizado',
+            ]);
+
+            $request->session()->regenerate();
+
+            return redirect()->intended(RouteServiceProvider::HOME);
+        }
+
         // Guardar credenciales temporales en la sesión
         $request->session()->put('auth.temp_user_id', $user->id);
         $request->session()->put('auth.remember', $request->boolean('remember'));
@@ -206,6 +223,24 @@ class AuthenticatedSessionController extends Controller
         $user->otp_code = null;
         $user->otp_expires_at = null;
         $user->save();
+
+        // Si el usuario es de tipo normal (user), solo requiere 2 factores (correo/contraseña -> OTP)
+        if ($user->role === 'user') {
+            Auth::loginUsingId($user->id, $request->session()->get('auth.remember', false));
+
+            SecurityLog::create([
+                'user_id' => $user->id,
+                'ip_address' => $request->ip(),
+                'email' => $user->email,
+                'event' => 'Autenticación Exitosa (2 Pasos - Usuario)',
+                'status' => 'Autorizado',
+            ]);
+
+            $request->session()->forget(['auth.temp_user_id', 'auth.otp_verified', 'auth.remember']);
+            $request->session()->regenerate();
+
+            return redirect()->intended(RouteServiceProvider::HOME);
+        }
 
         SecurityLog::create([
             'user_id' => $user->id,
