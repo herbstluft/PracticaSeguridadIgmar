@@ -13,7 +13,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
-     * The attributes that are mass assignable.
+     * Los atributos que se pueden asignar masivamente.
      *
      * @var array<int, string>
      */
@@ -21,25 +21,36 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'two_factor_secret',
+        'two_factor_confirmed_at',
+        'otp_code',
+        'otp_expires_at',
+        'backup_codes',
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
+     * Los atributos que deben ocultarse para la serialización.
      *
      * @var array<int, string>
      */
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'backup_codes',
     ];
 
     /**
-     * The attributes that should be cast.
+     * Los atributos que deben convertirse (cast).
      *
      * @var array<string, string>
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'two_factor_confirmed_at' => 'datetime',
+        'otp_expires_at' => 'datetime',
+        'backup_codes' => 'array',
     ];
 }
