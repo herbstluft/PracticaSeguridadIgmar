@@ -12,6 +12,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
+use App\Mail\ActivationMail;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -77,7 +80,7 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => $request->role ?? 'user',
+            'role' => 'guest',
         ]);
 
         \App\Models\SecurityLog::create([
@@ -90,8 +93,45 @@ class RegisteredUserController extends Controller
 
         event(new Registered($user));
 
-        Auth::login($user);
+        $activationUrl = URL::temporarySignedRoute(
+            'activate',
+            now()->addMinutes(5),
+            ['user' => $user->id]
+        );
 
-        return redirect(RouteServiceProvider::HOME);
+        try {
+            Mail::to($user->email)->send(new ActivationMail($user, $activationUrl));
+        } catch (\Exception $e) {
+            logger()->error('Error al enviar correo de activación: ' . $e->getMessage());
+        }
+
+        return redirect()->route('login')->with('status', '¡Registro Pendiente! Por favor, verifica tu correo electrónico para activar tu cuenta. El enlace de activación expira en 5 minutos.</b>');
+    }
+
+    /**
+     * Activar la cuenta del usuario si la firma de la URL es válida.
+     */
+    public function activate(Request $request, User $user): RedirectResponse
+    {
+        if (! $request->hasValidSignature()) {
+            return redirect()->route('login')->with('status', 'El enlace de activación es inválido o ha expirado.');
+        }
+
+        if ($user->email_verified_at) {
+            return redirect()->route('login')->with('status', 'Esta cuenta ya ha sido activada anteriormente.');
+        }
+
+        $user->email_verified_at = now();
+        $user->save();
+
+        \App\Models\SecurityLog::create([
+            'user_id' => $user->id,
+            'ip_address' => $request->ip(),
+            'email' => $user->email,
+            'event' => 'Activación de Cuenta',
+            'status' => 'Exitoso',
+        ]);
+
+        return redirect()->route('login')->with('status', '¡Tu cuenta ha sido activada con éxito! Ya puedes iniciar sesión.');
     }
 }

@@ -149,6 +149,20 @@ class AuthenticatedSessionController extends Controller
             ]);
         }
 
+        if (is_null($user->email_verified_at)) {
+            SecurityLog::create([
+                'user_id' => $user->id,
+                'ip_address' => $request->ip(),
+                'email' => $user->email,
+                'event' => 'Intento de Acceso (Cuenta No Activa)',
+                'status' => 'Rechazado',
+            ]);
+
+            throw ValidationException::withMessages([
+                'email' => 'Debes activar tu cuenta antes de iniciar sesión. Por favor, revisa tu correo electrónico.',
+            ]);
+        }
+
         RateLimiter::clear($throttleKey);
         session()->forget('login_attempts');
 

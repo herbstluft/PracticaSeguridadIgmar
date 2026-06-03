@@ -21,6 +21,8 @@ Route::middleware('guest')->group(function () {
     Route::post('register', [RegisteredUserController::class, 'store']);
     Route::get('refresh-register-captcha', [RegisteredUserController::class, 'refreshCaptcha'])
                 ->name('captcha.register.refresh');
+    Route::get('activate-account/{user}', [RegisteredUserController::class, 'activate'])
+                ->name('activate');
 
     // Inicio de Sesión (Paso 1: Credenciales)
     Route::get('login', [AuthenticatedSessionController::class, 'create'])

@@ -39,7 +39,7 @@ export default {
             email: '',
             password: '',
             password_confirmation: '',
-            role: 'user',
+            role: 'guest',
             captcha: '',
         });
 
@@ -165,22 +165,7 @@ export default {
                 <InputError class="mt-1" :message="form.errors.email" />
             </div>
 
-            <!-- Selector de Roles -->
-            <div>
-                <InputLabel for="role" value="Rol de Demostración" class="text-slate-700 font-semibold text-xs uppercase tracking-wider" />
-                <select
-                    id="role"
-                    v-model="form.role"
-                    class="mt-1.5 block w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-3 text-sm shadow-sm transition-all duration-200"
-                    required
-                    :disabled="lockSeconds > 0"
-                >
-                    <option value="user">Usuario Estándar</option>
-                    <option value="admin">Administrador de Seguridad</option>
-                    <option value="guest">Usuario Invitado</option>
-                </select>
-                <InputError class="mt-1" :message="form.errors.role" />
-            </div>
+
 
             <!-- Captcha de Seguridad -->
             <div class="space-y-2">
