@@ -25,49 +25,42 @@ Route::middleware('slack.log')->group(function () {
 
     Route::get('/dashboard', function () {
         $user = auth()->user();
-        
-        // Sembrar de forma dinámica algunos registros de seguridad iniciales si la tabla está vacía
-        if (SecurityLog::count() === 0) {
-            $admin = User::where('role', 'admin')->first();
-            $normalUser = User::where('role', 'user')->first();
-            $guest = User::where('role', 'guest')->first();
-
-            SecurityLog::create([
-                'user_id' => $admin ? $admin->id : null,
-                'ip_address' => fake()->ipv4,
-                'email' => $admin ? $admin->email : 'admin@seguridad.com',
-                'event' => 'Autenticación Exitosa (3 Pasos)',
-                'status' => 'Autorizado',
-            ]);
-
-            SecurityLog::create([
-                'user_id' => $normalUser ? $normalUser->id : null,
-                'ip_address' => fake()->ipv4,
-                'email' => $normalUser ? $normalUser->email : 'usuario@seguridad.com',
-                'event' => 'Intento 2FA Inválido',
-                'status' => 'Rechazado',
-            ]);
-
-            SecurityLog::create([
-                'user_id' => $guest ? $guest->id : null,
-                'ip_address' => fake()->ipv4,
-                'email' => $guest ? $guest->email : 'invitado@seguridad.com',
-                'event' => 'Código OTP Expirado',
-                'status' => 'Rechazado',
-            ]);
-        }
-
         $data = [];
 
         if ($user->role === 'admin') {
-            $data['users'] = User::select('name', 'email', 'role', 'two_factor_confirmed_at')->get()->map(function ($u) {
-                return [
-                    'name' => $u->name,
-                    'email' => $u->email,
-                    'role' => $u->role,
-                    'mfa' => $u->two_factor_confirmed_at ? 'Activo' : 'Inactivo',
-                ];
-            });
+            $search = request('search');
+            $usersQuery = User::select('id', 'name', 'email', 'role', 'two_factor_confirmed_at', 'email_verified_at');
+            
+            if ($search) {
+                $usersQuery->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
+                });
+            }
+            
+            $paginatedUsers = $usersQuery->paginate(8)->withQueryString();
+            
+            $data['users'] = [
+                'data' => $paginatedUsers->map(function ($u) {
+                    return [
+                        'id' => $u->id,
+                        'name' => $u->name,
+                        'email' => $u->email,
+                        'role' => $u->role,
+                        'mfa' => $u->two_factor_confirmed_at ? 'Activo' : 'Inactivo',
+                        'email_otp' => in_array($u->role, ['admin', 'user']) ? 'Activo' : 'Inactivo',
+                    ];
+                })->all(),
+                'links' => $paginatedUsers->linkCollection()->toArray(),
+                'current_page' => $paginatedUsers->currentPage(),
+                'last_page' => $paginatedUsers->lastPage(),
+                'total' => $paginatedUsers->total(),
+                'per_page' => $paginatedUsers->perPage(),
+            ];
+
+            $data['filters'] = [
+                'search' => $search,
+            ];
             
             $data['securityLogs'] = SecurityLog::latest()->take(50)->get()->map(function ($log) {
                 return [
@@ -97,6 +90,14 @@ Route::middleware('slack.log')->group(function () {
 
         return Inertia::render('Dashboard', $data);
     })->middleware(['auth', 'verified'])->name('dashboard');
+
+    Route::post('/admin/users/change-role', [\App\Http\Controllers\Auth\AdminUserController::class, 'changeRole'])
+        ->middleware(['auth', 'verified'])
+        ->name('admin.users.change-role');
+
+    Route::post('/admin/users/reset-mfa', [\App\Http\Controllers\Auth\AdminUserController::class, 'resetMfa'])
+        ->middleware(['auth', 'verified'])
+        ->name('admin.users.reset-mfa');
 
     Route::middleware('auth')->group(function () {
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

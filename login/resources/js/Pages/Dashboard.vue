@@ -16,8 +16,12 @@ export default {
     },
     props: {
         users: {
-            type: Array,
+            type: [Array, Object],
             default: () => [],
+        },
+        filters: {
+            type: Object,
+            default: () => ({}),
         },
         securityLogs: {
             type: Array,
@@ -63,6 +67,7 @@ export default {
                 <AdminDashboard
                     v-if="user.role === 'admin'"
                     :users="users"
+                    :filters="filters"
                     :security-logs="securityLogs"
                 />
 
