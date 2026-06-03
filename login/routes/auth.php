@@ -19,11 +19,15 @@ Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])
                 ->name('register');
     Route::post('register', [RegisteredUserController::class, 'store']);
+    Route::get('refresh-register-captcha', [RegisteredUserController::class, 'refreshCaptcha'])
+                ->name('captcha.register.refresh');
 
     // Inicio de Sesión (Paso 1: Credenciales)
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
                 ->name('login');
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    Route::get('refresh-captcha', [AuthenticatedSessionController::class, 'refreshCaptcha'])
+                ->name('captcha.refresh');
 
     // Verificación OTP (Paso 2: Código de un solo uso por Correo)
     Route::get('verify-otp', [AuthenticatedSessionController::class, 'showOtpForm'])

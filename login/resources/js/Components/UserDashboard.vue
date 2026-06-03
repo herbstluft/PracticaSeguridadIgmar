@@ -101,15 +101,14 @@ export default {
                             <p
                                 class="text-xs text-slate-400 mt-0.5 font-medium"
                             >
-                                El código cambia cada 30 segundos en tu
-                                dispositivo móvil.
+                                El código de verificación es enviado a tu correo electrónico registrado.
                             </p>
                         </div>
                     </div>
                 </div>
 
                 <div class="text-xs text-slate-400 pt-2 leading-relaxed">
-                    * Si pierdes acceso a tu aplicación Google Authenticator,
+                    * Si pierdes acceso a tu correo electrónico,
                     contacta al administrador de seguridad del sistema para
                     restablecer tu perfil de doble factor.
                 </div>

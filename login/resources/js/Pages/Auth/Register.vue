@@ -18,6 +18,21 @@ export default {
         Head,
         Link
     },
+    props: {
+        captchaSvg: {
+            type: String,
+        },
+    },
+    data() {
+        return {
+            currentCaptchaSvg: this.captchaSvg,
+        };
+    },
+    watch: {
+        captchaSvg(newVal) {
+            this.currentCaptchaSvg = newVal;
+        }
+    },
     setup() {
         const form = useForm({
             name: '',
@@ -25,6 +40,7 @@ export default {
             password: '',
             password_confirmation: '',
             role: 'user',
+            captcha: '',
         });
 
         // Temporizador de rate limit para prevenir spam en el registro
@@ -85,8 +101,22 @@ export default {
         // Registra el usuario enviando el formulario al endpoint correspondiente
         submit() {
             this.form.post(route('register'), {
-                onFinish: () => this.form.reset('password', 'password_confirmation'),
+                onFinish: () => {
+                    this.form.reset('password', 'password_confirmation');
+                    this.refreshCaptcha();
+                },
             });
+        },
+        // Refresca el código captcha dinámicamente
+        async refreshCaptcha() {
+            try {
+                const response = await fetch(route('captcha.register.refresh'));
+                const data = await response.json();
+                this.currentCaptchaSvg = data.captchaSvg;
+                this.form.captcha = '';
+            } catch (error) {
+                console.error('Error al refrescar el Captcha:', error);
+            }
         }
     }
 };
@@ -150,6 +180,41 @@ export default {
                     <option value="guest">Usuario Invitado</option>
                 </select>
                 <InputError class="mt-1" :message="form.errors.role" />
+            </div>
+
+            <!-- Captcha de Seguridad -->
+            <div class="space-y-2">
+                <InputLabel for="captcha" value="Código de Seguridad" class="text-slate-700 font-semibold text-xs uppercase tracking-wider" />
+                <div class="flex items-center space-x-3">
+                    <!-- Contenedor del Captcha SVG -->
+                    <div v-html="currentCaptchaSvg" class="flex-shrink-0 shadow-sm border border-slate-100 rounded-xl overflow-hidden h-[50px] flex items-center bg-slate-50"></div>
+                    
+                    <!-- Botón para refrescar el Captcha -->
+                    <button
+                        type="button"
+                        @click="refreshCaptcha"
+                        class="p-2.5 bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all duration-200 shadow-sm flex items-center justify-center h-[50px] w-[50px]"
+                        title="Actualizar Código"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                    </button>
+
+                    <!-- Campo de entrada para el Captcha -->
+                    <TextInput
+                        id="captcha"
+                        type="text"
+                        class="block w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-3 text-sm shadow-sm transition-all duration-200 h-[50px]"
+                        v-model="form.captcha"
+                        required
+                        autocomplete="off"
+                        placeholder="Ingresa el código"
+                        maxlength="5"
+                        :disabled="lockSeconds > 0"
+                    />
+                </div>
+                <InputError class="mt-1" :message="form.errors.captcha" />
             </div>
 
             <!-- Contraseña -->

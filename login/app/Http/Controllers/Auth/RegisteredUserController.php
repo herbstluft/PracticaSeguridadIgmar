@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
+use App\Helpers\CaptchaGenerator;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,7 +24,19 @@ class RegisteredUserController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('Auth/Register');
+        return Inertia::render('Auth/Register', [
+            'captchaSvg' => CaptchaGenerator::generate('register_captcha'),
+        ]);
+    }
+
+    /**
+     * Refrescar el captcha de registro y retornar el nuevo SVG en JSON.
+     */
+    public function refreshCaptcha(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'captchaSvg' => CaptchaGenerator::generate('register_captcha'),
+        ]);
     }
 
     /**
@@ -46,8 +59,17 @@ class RegisteredUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::min(8)->mixedCase()->numbers()->symbols()],
-            'role' => 'required|string|in:admin,user,guest',
+            'captcha' => 'required|string',
         ]);
+
+        $sessionCaptcha = session('register_captcha');
+        session()->forget('register_captcha');
+
+        if (!$sessionCaptcha || strtolower($request->captcha) !== $sessionCaptcha) {
+            throw ValidationException::withMessages([
+                'captcha' => 'El código de seguridad (Captcha) es incorrecto.',
+            ]);
+        }
 
         RateLimiter::hit($throttleKey, 60);
 
@@ -55,7 +77,7 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => $request->role,
+            'role' => $request->role ?? 'user',
         ]);
 
         \App\Models\SecurityLog::create([

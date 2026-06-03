@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use App\Helpers\CaptchaGenerator;
 use App\Models\SecurityLog;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -28,9 +29,14 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): Response
     {
+        $attempts = session('login_attempts', 0);
+        $showCaptcha = $attempts >= 3;
+
         return Inertia::render('Auth/Login', [
             'canResetPassword' => Route::has('password.request'),
             'status' => session('status'),
+            'showCaptcha' => $showCaptcha,
+            'captchaSvg' => $showCaptcha ? CaptchaGenerator::generate('login_captcha') : null,
         ]);
     }
 
@@ -60,19 +66,41 @@ class AuthenticatedSessionController extends Controller
     }
 
     /**
+     * Refrescar el captcha y retornar el nuevo SVG en JSON.
+     */
+    public function refreshCaptcha(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'captchaSvg' => CaptchaGenerator::generate('login_captcha'),
+        ]);
+    }
+
+    /**
      * Manejar el Paso 1 del inicio de sesión: Validación de correo y contraseña.
      */
     public function store(Request $request): RedirectResponse
     {
-        $request->validate([
+        $attempts = session('login_attempts', 0);
+        $showCaptcha = $attempts >= 3;
+
+        $rules = [
             'email' => 'required|string|email',
             'password' => 'required|string',
-        ]);
+        ];
+
+        if ($showCaptcha) {
+            $rules['captcha'] = 'required|string';
+        }
+
+        $request->validate($rules);
 
         $throttleKey = Str::transliterate(Str::lower($request->input('email')).'|'.$request->ip());
 
+        // 1. Verificar bloqueo por Rate Limit primero
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
+
+            session(['login_attempts' => session('login_attempts', 0) + 1]);
 
             SecurityLog::create([
                 'ip_address' => $request->ip(),
@@ -86,10 +114,27 @@ class AuthenticatedSessionController extends Controller
             ]);
         }
 
+        // 2. Verificar Captcha si corresponde
+        if ($showCaptcha) {
+            $sessionCaptcha = session('login_captcha');
+            session()->forget('login_captcha');
+
+            if (!$sessionCaptcha || strtolower($request->input('captcha')) !== $sessionCaptcha) {
+                // Registrar este fallo en el Rate Limiter
+                RateLimiter::hit($throttleKey);
+
+                throw ValidationException::withMessages([
+                    'captcha' => 'El código de seguridad (Captcha) es incorrecto.',
+                ]);
+            }
+        }
+
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             RateLimiter::hit($throttleKey);
+
+            session(['login_attempts' => session('login_attempts', 0) + 1]);
 
             SecurityLog::create([
                 'user_id' => $user ? $user->id : null,
@@ -105,6 +150,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         RateLimiter::clear($throttleKey);
+        session()->forget('login_attempts');
 
         // Si el usuario es de tipo invitado (guest), solo requiere 1 factor (correo y contraseña)
         if ($user->role === 'guest') {
