@@ -53,6 +53,7 @@ class AuthenticatedSessionController extends Controller
         SecurityLog::create([
             'user_id' => $user->id,
             'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
             'email' => $user->email,
             'event' => $event,
             'status' => 'Pendiente',
@@ -61,7 +62,10 @@ class AuthenticatedSessionController extends Controller
         try {
             Mail::to($user->email)->send(new OtpMail($otpCode));
         } catch (\Exception $e) {
-            logger()->error('Error al enviar correo OTP: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::channel('development')->error('Error al enviar correo OTP', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
     }
 
@@ -104,6 +108,7 @@ class AuthenticatedSessionController extends Controller
 
             SecurityLog::create([
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $request->email,
                 'event' => 'Bloqueo por Rate Limit (Login)',
                 'status' => 'Bloqueado (Rate Limit)',
@@ -139,6 +144,7 @@ class AuthenticatedSessionController extends Controller
             SecurityLog::create([
                 'user_id' => $user ? $user->id : null,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $request->email,
                 'event' => 'Fallo de Contraseña',
                 'status' => 'Rechazado',
@@ -153,6 +159,7 @@ class AuthenticatedSessionController extends Controller
             SecurityLog::create([
                 'user_id' => $user->id,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $user->email,
                 'event' => 'Intento de Acceso (Cuenta No Activa)',
                 'status' => 'Rechazado',
@@ -173,6 +180,7 @@ class AuthenticatedSessionController extends Controller
             SecurityLog::create([
                 'user_id' => $user->id,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $user->email,
                 'event' => 'Autenticación Exitosa (1 Paso - Invitado)',
                 'status' => 'Autorizado',
@@ -251,6 +259,7 @@ class AuthenticatedSessionController extends Controller
             SecurityLog::create([
                 'user_id' => $user->id,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $user->email,
                 'event' => 'Bloqueo por Rate Limit (OTP)',
                 'status' => 'Bloqueado (Rate Limit)',
@@ -267,6 +276,7 @@ class AuthenticatedSessionController extends Controller
             SecurityLog::create([
                 'user_id' => $user->id,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $user->email,
                 'event' => 'Fallo de Código OTP / Expirado',
                 'status' => 'Rechazado',
@@ -291,6 +301,7 @@ class AuthenticatedSessionController extends Controller
             SecurityLog::create([
                 'user_id' => $user->id,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $user->email,
                 'event' => 'Autenticación Exitosa (2 Pasos - Usuario)',
                 'status' => 'Autorizado',
@@ -305,6 +316,7 @@ class AuthenticatedSessionController extends Controller
         SecurityLog::create([
             'user_id' => $user->id,
             'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
             'email' => $user->email,
             'event' => 'Código OTP Validado',
             'status' => 'Exitoso',
@@ -401,6 +413,7 @@ class AuthenticatedSessionController extends Controller
             \App\Models\SecurityLog::create([
                 'user_id' => $user->id,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $user->email,
                 'event' => 'Bloqueo por Rate Limit (2FA)',
                 'status' => 'Bloqueado (Rate Limit)',
@@ -441,6 +454,7 @@ class AuthenticatedSessionController extends Controller
             SecurityLog::create([
                 'user_id' => $user->id,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $user->email,
                 'event' => $isBackupCode ? 'Intento fallido con Código de Respaldo' : 'Intento fallido con Google Authenticator',
                 'status' => 'Rechazado',
@@ -464,6 +478,7 @@ class AuthenticatedSessionController extends Controller
         SecurityLog::create([
             'user_id' => $user->id,
             'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
             'email' => $user->email,
             'event' => $isBackupCode ? 'Autenticación con Código de Respaldo' : 'Autenticación con Google Authenticator',
             'status' => 'Autorizado',
@@ -501,6 +516,7 @@ class AuthenticatedSessionController extends Controller
             SecurityLog::create([
                 'user_id' => $user->id,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $user->email,
                 'event' => 'Bloqueo por Rate Limit (Reenvío OTP)',
                 'status' => 'Bloqueado (Rate Limit)',

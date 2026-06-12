@@ -44,6 +44,7 @@ class AdminUserController extends Controller
             SecurityLog::create([
                 'user_id' => $admin->id,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $admin->email,
                 'event' => "Intento fallido de Cambio de Rol (Destino: {$targetEmail})",
                 'status' => 'Rechazado',
@@ -71,6 +72,7 @@ class AdminUserController extends Controller
         SecurityLog::create([
             'user_id' => $admin->id,
             'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
             'email' => $admin->email,
             'event' => "Cambio de Rol de Usuario (Destino: {$targetUser->email}, de {$oldRole} a {$request->role})",
             'status' => 'Exitoso',
@@ -112,6 +114,7 @@ class AdminUserController extends Controller
             SecurityLog::create([
                 'user_id' => $admin->id,
                 'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'email' => $admin->email,
                 'event' => "Intento fallido de Restablecer MFA (Destino: {$targetEmail})",
                 'status' => 'Rechazado',
@@ -140,6 +143,7 @@ class AdminUserController extends Controller
         SecurityLog::create([
             'user_id' => $admin->id,
             'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
             'email' => $admin->email,
             'event' => "Restablecimiento de MFA de Usuario (Destino: {$targetUser->email})",
             'status' => 'Exitoso',

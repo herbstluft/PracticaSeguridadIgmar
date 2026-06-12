@@ -54,8 +54,14 @@ return [
     'channels' => [
         'stack' => [
             'driver' => 'stack',
-            'channels' => ['single'],
+            'channels' => ['single','slack_dev'],
             'ignore_exceptions' => false,
+        ],
+
+        'development' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/development.log'),
+            'level' => 'debug',
         ],
 
         'single' => [
@@ -79,6 +85,15 @@ return [
             'username' => 'Laravel Log',
             'emoji' => ':boom:',
             'level' => env('LOG_LEVEL', 'critical'),
+            'replace_placeholders' => true,
+        ],
+
+        'slack_dev' => [
+            'driver' => 'slack',
+            'url' => env('SLACK_DEV_WEBHOOK_URL'),
+            'username' => 'Laravel Dev Logs',
+            'emoji' => ':bug:',
+            'level' => 'debug',
             'replace_placeholders' => true,
         ],
 

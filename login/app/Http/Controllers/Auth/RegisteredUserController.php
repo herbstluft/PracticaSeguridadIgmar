@@ -86,6 +86,7 @@ class RegisteredUserController extends Controller
         \App\Models\SecurityLog::create([
             'user_id' => $user->id,
             'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
             'email' => $user->email,
             'event' => 'Registro de Cuenta Nueva',
             'status' => 'Exitoso',
@@ -102,7 +103,10 @@ class RegisteredUserController extends Controller
         try {
             Mail::to($user->email)->send(new ActivationMail($user, $activationUrl));
         } catch (\Exception $e) {
-            logger()->error('Error al enviar correo de activación: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::channel('development')->error('Error al enviar correo de activación', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
 
         return redirect()->route('login')->with('status', '¡Registro Pendiente! Por favor, verifica tu correo electrónico para activar tu cuenta. El enlace de activación expira en 5 minutos.</b>');
@@ -127,6 +131,7 @@ class RegisteredUserController extends Controller
         \App\Models\SecurityLog::create([
             'user_id' => $user->id,
             'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
             'email' => $user->email,
             'event' => 'Activación de Cuenta',
             'status' => 'Exitoso',

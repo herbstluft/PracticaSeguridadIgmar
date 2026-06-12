@@ -66,6 +66,7 @@ Route::middleware('slack.log')->group(function () {
                 return [
                     'id' => $log->id,
                     'ip' => $log->ip_address ?? '127.0.0.1',
+                    'user_agent' => $log->user_agent ?? 'Desconocido',
                     'email' => $log->email ?? 'N/A',
                     'event' => $log->event,
                     'status' => $log->status,
@@ -82,6 +83,7 @@ Route::middleware('slack.log')->group(function () {
                         'id' => $log->id,
                         'device' => $log->event,
                         'location' => $log->ip_address ?? '127.0.0.1',
+                        'user_agent' => $log->user_agent ?? 'Desconocido',
                         'status' => $log->status,
                         'time' => $log->created_at->diffForHumans(),
                     ];
