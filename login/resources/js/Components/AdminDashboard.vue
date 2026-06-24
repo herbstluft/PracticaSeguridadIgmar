@@ -18,8 +18,20 @@ export default {
             default: () => ({})
         },
         securityLogs: {
-            type: Array,
+            type: [Array, Object],
             default: () => []
+        },
+        logOptions: {
+            type: Object,
+            default: () => ({ events: [], statuses: [] })
+        },
+        logFilters: {
+            type: Object,
+            default: () => ({ ip: '', email: '', event: '', status: '', per_page: 20 })
+        },
+        stats: {
+            type: Object,
+            default: () => ({ blockRate: 0, lastBlockIp: 'Ninguno' })
         }
     },
     data() {
@@ -36,12 +48,26 @@ export default {
             errorMessage: '',
             successMessage: '',
             searchQuery: this.filters?.search || '',
-            searchTimeout: null
+            searchTimeout: null,
+            filtersState: {
+                ip: this.logFilters?.ip || '',
+                email: this.logFilters?.email || '',
+                event: this.logFilters?.event || '',
+                status: this.logFilters?.status || '',
+                per_page: this.logFilters?.per_page || 20
+            },
+            logSearchTimeout: null
         };
     },
     watch: {
         searchQuery(newVal) {
             this.performSearch(newVal);
+        },
+        filtersState: {
+            handler(newVal) {
+                this.performLogSearch(newVal);
+            },
+            deep: true
         }
     },
     computed: {
@@ -50,7 +76,13 @@ export default {
             return Array.isArray(this.users) ? this.users : (this.users.data || []);
         },
         isPaginated() {
-            return !Array.isArray(this.users) && this.users.links && this.users.links.length > 3;
+            return !Array.isArray(this.users) && this.users.total > 0;
+        },
+        securityLogList() {
+            return Array.isArray(this.securityLogs) ? this.securityLogs : (this.securityLogs.data || []);
+        },
+        isLogsPaginated() {
+            return !Array.isArray(this.securityLogs) && this.securityLogs.total > 0;
         }
     },
     methods: {
@@ -132,13 +164,58 @@ export default {
                 });
             }, 300);
         },
+        performLogSearch(filters) {
+            if (this.logSearchTimeout) {
+                clearTimeout(this.logSearchTimeout);
+            }
+            this.logSearchTimeout = setTimeout(() => {
+                router.get(route('dashboard'), { 
+                    search: this.searchQuery,
+                    log_ip: filters.ip,
+                    log_email: filters.email,
+                    log_event: filters.event,
+                    log_status: filters.status,
+                    logs_per_page: filters.per_page
+                }, {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    only: ['securityLogs', 'logFilters']
+                });
+            }, 300);
+        },
         goToPage(url) {
             if (!url) return;
-            router.get(url, {}, {
+            router.get(url, { search: this.searchQuery }, {
                 preserveState: true,
                 preserveScroll: true,
                 only: ['users']
             });
+        },
+        goToLogPage(url) {
+            if (!url) return;
+            router.get(url, {
+                search: this.searchQuery,
+                log_ip: this.filtersState.ip,
+                log_email: this.filtersState.email,
+                log_event: this.filtersState.event,
+                log_status: this.filtersState.status,
+                logs_per_page: this.filtersState.per_page
+            }, {
+                preserveState: true,
+                preserveScroll: true,
+                only: ['securityLogs']
+            });
+        },
+        handleUserPageChange(val) {
+            this.goToPage(`${route('dashboard')}?page=${val}`);
+        },
+        handleLogSizeChange(val) {
+            this.filtersState.per_page = val;
+            this.performLogSearch(this.filtersState);
+        },
+        handleLogPageChange(val) {
+            this.goToLogPage(`${route('dashboard')}?logs_page=${val}`);
         }
     }
 };
@@ -162,10 +239,10 @@ export default {
             <div class="p-6 bg-white border border-slate-100 rounded-3xl shadow-xl shadow-slate-100/70 flex flex-col justify-between">
                 <div>
                     <span class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Tasa de Bloqueos (IP)</span>
-                    <h3 class="text-3xl font-extrabold text-slate-900 mt-2">0.2%</h3>
+                    <h3 class="text-3xl font-extrabold text-slate-900 mt-2">{{ stats.blockRate }}%</h3>
                 </div>
                 <div class="mt-4 text-xs text-slate-400 font-medium">
-                    Último bloqueo: IP aleatoria registrada
+                    Último bloqueo: <span class="font-bold">{{ stats.lastBlockIp }}</span>
                 </div>
             </div>
 
@@ -182,9 +259,27 @@ export default {
 
         <!-- Actividad del Sistema y Bitácoras -->
         <div class="bg-white border border-slate-100 rounded-3xl shadow-xl shadow-slate-100/70 overflow-hidden">
-            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-slate-50/50">
                 <h3 class="font-bold text-slate-900 text-lg">Bitácora Global de Eventos de Seguridad (SIEM)</h3>
-                <span class="px-2.5 py-1 text-xs font-bold bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">Monitoreo Activo</span>
+                <div class="flex items-center space-x-3">
+                    <span class="px-2.5 py-1 text-xs font-bold bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">Monitoreo Activo</span>
+                </div>
+            </div>
+            
+            <!-- Controles de Paginación para Bitácora con Element Plus (Arriba) -->
+            <div v-if="isLogsPaginated" class="p-4 flex justify-center sm:justify-end border-b border-slate-100 bg-white overflow-x-auto max-w-full">
+                <el-pagination
+                    class="min-w-max"
+                    background
+                    layout="total, sizes, prev, pager, next"
+                    :page-sizes="[20, 30, 50, 100]"
+                    :pager-count="5"
+                    :current-page="securityLogs.current_page"
+                    :page-size="Number(filtersState.per_page)"
+                    :total="securityLogs.total"
+                    @size-change="handleLogSizeChange"
+                    @current-change="handleLogPageChange"
+                />
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -196,9 +291,26 @@ export default {
                             <th class="p-4">Estado</th>
                             <th class="p-4 text-right">Tiempo</th>
                         </tr>
+                        <tr class="bg-slate-50/50 border-b border-slate-100">
+                            <th class="p-2 px-4"><input v-model="filtersState.ip" type="text" placeholder="Filtrar IP..." class="w-full px-2 py-1.5 bg-white border border-slate-200 text-slate-900 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-xs shadow-sm transition-all duration-200 font-normal" /></th>
+                            <th class="p-2 px-4"><input v-model="filtersState.email" type="text" placeholder="Filtrar Usuario..." class="w-full px-2 py-1.5 bg-white border border-slate-200 text-slate-900 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-xs shadow-sm transition-all duration-200 font-normal" /></th>
+                            <th class="p-2 px-4">
+                                <select v-model="filtersState.event" class="w-full px-2 py-1.5 bg-white border border-slate-200 text-slate-900 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-xs shadow-sm transition-all duration-200 font-normal">
+                                    <option value="">Todos</option>
+                                    <option v-for="event in logOptions.events" :key="event" :value="event">{{ event }}</option>
+                                </select>
+                            </th>
+                            <th class="p-2 px-4">
+                                <select v-model="filtersState.status" class="w-full px-2 py-1.5 bg-white border border-slate-200 text-slate-900 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-xs shadow-sm transition-all duration-200 font-normal">
+                                    <option value="">Todos</option>
+                                    <option v-for="status in logOptions.statuses" :key="status" :value="status">{{ status }}</option>
+                                </select>
+                            </th>
+                            <th class="p-2 px-4"></th>
+                        </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 text-sm text-slate-600">
-                        <tr v-for="log in securityLogs" :key="log.id" class="hover:bg-slate-50/50 transition-colors duration-150">
+                        <tr v-for="log in securityLogList" :key="log.id" class="hover:bg-slate-50/50 transition-colors duration-150">
                             <td class="p-4 font-mono text-xs font-semibold text-indigo-600">{{ log.ip }}</td>
                             <td class="p-4 font-semibold text-slate-800">{{ log.email }}</td>
                             <td class="p-4 text-slate-500 font-medium">{{ log.event }}</td>
@@ -217,8 +329,8 @@ export default {
                         </tr>
                     </tbody>
                 </table>
-                <div v-if="securityLogs.length === 0" class="py-12 text-center text-xs text-slate-400 font-medium">
-                    Sin eventos registrados en la bitácora SIEM.
+                <div v-if="securityLogList.length === 0" class="py-12 text-center text-xs text-slate-400 font-medium">
+                    Sin eventos registrados en la bitácora SIEM que coincidan con los filtros.
                 </div>
             </div>
         </div>
@@ -241,6 +353,21 @@ export default {
                     />
                 </div>
             </div>
+            
+            <!-- Controles de Paginación para Usuarios con Element Plus (Arriba) -->
+            <div v-if="isPaginated" class="p-4 flex justify-center sm:justify-end border-b border-slate-100 bg-white overflow-x-auto max-w-full">
+                <el-pagination
+                    class="min-w-max"
+                    background
+                    layout="total, prev, pager, next"
+                    :pager-count="5"
+                    :current-page="users.current_page"
+                    :page-size="users.per_page"
+                    :total="users.total"
+                    @current-change="handleUserPageChange"
+                />
+            </div>
+
             <div class="p-6">
                 <div class="overflow-x-auto rounded-2xl border border-slate-100">
                     <table class="w-full text-left border-collapse">
@@ -312,28 +439,6 @@ export default {
                     
                     <div v-if="userList.length === 0" class="py-12 text-center text-xs text-slate-400 font-medium bg-white">
                         No se encontraron usuarios registrados con los criterios de búsqueda.
-                    </div>
-                </div>
-
-                <!-- Controles de Paginación -->
-                <div v-if="isPaginated" class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 pt-5">
-                    <div class="text-xs text-slate-500 font-medium">
-                        Mostrando del <b>{{ (users.current_page - 1) * users.per_page + 1 }}</b> al <b>{{ Math.min(users.current_page * users.per_page, users.total) }}</b> de <b>{{ users.total }}</b> usuarios
-                    </div>
-                    <div class="flex items-center space-x-1">
-                        <button
-                            v-for="link in users.links"
-                            :key="link.label"
-                            @click="goToPage(link.url)"
-                            :disabled="!link.url || link.active"
-                            class="px-3 py-2 text-xs font-bold rounded-xl border transition-all duration-200"
-                            :class="{
-                                'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100': link.active,
-                                'bg-white border-slate-200 text-slate-700 hover:bg-slate-50': !link.active && link.url,
-                                'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed': !link.url
-                            }"
-                            v-html="link.label"
-                        ></button>
                     </div>
                 </div>
             </div>
